@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS discord_users(
     id TEXT primary key,
-    username TEXT NOT NULL,
-    discriminator TEXT NOT NULL
+    username TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS pending_invites(

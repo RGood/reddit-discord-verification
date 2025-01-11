@@ -69,7 +69,10 @@ func Run(s *discordgo.Session, inviteService *invite.InviteService) {
 					return
 				}
 
-				userCode, _ := inviteService.GenerateCode(m.Author, m.GuildID)
+				userCode, err := inviteService.GenerateCode(m.Author, m.GuildID)
+				if err != nil {
+					panic(err)
+				}
 				_, err = s.ChannelMessageSend(channel.ID, WelcomeMessage+utils.CreateMessageURL(botUsername, messageSubect, userCode))
 				if err != nil {
 					// If an error occurred, we failed to send the message.

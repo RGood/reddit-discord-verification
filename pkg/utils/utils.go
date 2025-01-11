@@ -17,9 +17,9 @@ func RandStringRunes(n int) string {
 }
 
 func CreateMessageURL(account, messageSubject, code string) string {
-	return url.QueryEscape(fmt.Sprintf("https://www.reddit.com/message/compose/?to=%s&subject=%s&message=%s",
-		account,
-		messageSubject,
-		code,
-	))
+	return fmt.Sprintf("https://www.reddit.com/message/compose/?to=%s&subject=%s&message=%s",
+		url.QueryEscape(account),
+		url.QueryEscape(messageSubject),
+		url.QueryEscape(code),
+	)
 }

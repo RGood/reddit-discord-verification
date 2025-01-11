@@ -19,10 +19,19 @@ var (
 	id       = os.Getenv("REDDIT_CLIENT_ID")
 	secret   = os.Getenv("REDDIT_SECRET_ID")
 
-	messageSubject = os.Getenv("MESSAGE_SUBJECT")
+	messageSubject       = os.Getenv("MESSAGE_SUBJECT")
+	mobileMessageSubject = strings.ReplaceAll(messageSubject, " ", "+")
+)
+
+const (
+	tmpRoleId      = "1311701000247181392"
+	tmpAdminRoleId = "1311701252358275102"
 )
 
 func Run(s *discordgo.Session, inviteService *invite.InviteService) {
+	println("Running Reddit Inbox Checker!")
+	defer println("Inbox checker exited!")
+
 	credentials := reddit.Credentials{
 		ID:       id,
 		Secret:   secret,
@@ -32,29 +41,58 @@ func Run(s *discordgo.Session, inviteService *invite.InviteService) {
 	client, _ := reddit.NewClient(credentials)
 
 	for range time.Tick(5 * time.Second) {
-		_, m2, _, _ := client.Message.InboxUnread(context.Background(), nil)
+		_, m2, _, err := client.Message.InboxUnread(context.Background(), nil)
+		if err != nil {
+			fmt.Printf("Error fetching inbox: %s\n", err.Error())
+			continue
+		}
+
 		handled := []string{}
 		for _, message := range m2 {
 
 			handled = append(handled, "t4_"+message.ID)
 
-			if message.Subject == messageSubject {
+			if message.Subject == messageSubject || message.Subject == mobileMessageSubject {
 				code := strings.TrimSpace(message.Text)
-				fmt.Printf("%s sent code: %s", message.Author, code)
-				ok, user, _ := inviteService.CheckCode(code)
+				fmt.Printf("%s sent code: %s\n", message.Author, code)
+				ok, user, err := inviteService.CheckCode(code)
+				if err != nil {
+					client.Comment.Submit(context.Background(), message.FullID, "Uh oh! That code doesn't lead anywhere. Please try leaving and re-joining the server!")
+					continue
+				}
 				if ok {
+
 					// Check if there's already a valid association for that reddit user
 					if !inviteService.IsValidated(strings.ToLower(message.Author)) {
 
 						// Approve the user
-						guildIDs := inviteService.ExpireCode(code)
+						guildIDs, err := inviteService.ExpireCode(code)
+						if err != nil {
+							fmt.Printf("Expire threw error: %s\n", err.Error())
+							continue
+						}
+						_, err = fmt.Printf("Updating %s's name in the guilds: %v\n", message.Author, guildIDs)
+						if err != nil {
+							println("fmt.Printf Err:", err.Error())
+						}
+
+						redditUser, _, err := client.User.Get(context.Background(), message.Author)
+						toAssign := []string{tmpRoleId}
+						if err == nil && redditUser.IsEmployee {
+							toAssign = append(toAssign, tmpAdminRoleId)
+						}
+
 						for _, guildID := range guildIDs {
-							err := s.GuildMemberNickname(guildID, user.Id, message.Author)
+							_, err := s.GuildMemberEdit(guildID, user.Id, &discordgo.GuildMemberParams{
+								Nick:  message.Author,
+								Roles: &toAssign,
+							})
 							if err != nil {
-								println("Error setting name in guild: %s; %v\n", guildID, err)
+								fmt.Printf("Error setting name for user %s in guild: %s; %v\n", user.Id, guildID, err)
 							}
 						}
 					} else {
+						println("Couldn't approve.")
 						discord.SendUserMessage(s, user.Id, fmt.Sprintf("Could not complete validation, because /u/%s is already associate with a Discord account.", message.Author))
 					}
 				}

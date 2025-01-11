@@ -18,7 +18,7 @@ services:
       - REDDIT_SECRET_ID=${REDDIT_SECRET_ID}
       - MESSAGE_SUBJECT=${MESSAGE_SUBJECT}
   postgres:
-    image: postgres:10.5
+    image: postgres:17.2
     restart: always
     environment:
       - POSTGRES_USER=postgres
@@ -31,7 +31,6 @@ services:
       - '5438:5432'
     volumes: 
       - ./postgres-data:/var/lib/postgresql/data
-      # copy the sql script to create tables
       - ./sql:/docker-entrypoint-initdb.d
 volumes:
   db:
